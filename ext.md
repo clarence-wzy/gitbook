@@ -119,6 +119,7 @@ public class Demo {
     }
 }
 ```
+4. try-catch是否会影响性能？（异常表）
 
 
 
