@@ -463,6 +463,13 @@ JVM必须在方法区中保存类型的所有域的相关信息以及域的声�
 
 JVM必须保存所有方法的**方法名称**、**方法的返回类型**、**方法参数的数量和类型**、**方法的修饰符**（public、private、protected、static、final、synchronized、native、abstract 的一个子集）、**方法的符号码**（bytecodes）、**操作数栈**、**局部变量表及大小**（abstract和native方法除外）、**异常表**（abstract和native方法除外；每个异常处理的开始位置、结束位置、代码处理在程序计数器中的偏移地址、被捕获的异常类的常量池索引）。
 
+异常表，每个exception_table都是由start_pc（开始位置）、end_pc（结束位置）、handler_pc（异常开始位置）组成
+
+![](/Users/wuziyi/git/gitbook/res/img/exception-table.png)
+
+- Jdk1.4及之前，并没有异常表的存在，而是通过jsr和set指令来处理异常
+- jdk1.4之后，统一采用方法区-异常表来处理异常
+
 
 
 ##### 常量池
@@ -561,7 +568,25 @@ JVM 被允许堆满足上述三个条件的无用类进行回收，这里说的*
 方法区是容量限制的，在大量使用反射、动态代理、CGLib等ByteCode框架、动态生成JSP以及OSGi等，这类频繁自定义ClassLoader的场景都需要虚拟机具备类卸载的功能，以保证永久代不会溢出。
 
 
+
+
 #### Out Of Heap Area - 堆外内存
+堆外内存，也称native本地内存，虽然堆外内存不受JVM管控，但是仍存在与Java进程中，而不是由系统内核直接管理。这里需要注意一下，新的方法区-元空间在jdk1.8开始已经从堆中转移到堆外，即**元空间存在与堆外内存，而堆外内存不单单包含元空间**。
+
+那为什么需要堆外内存呢？又或者说，为什么要将元空间转移至堆外呢？
+- 减少内存在Native堆和JVM堆拷贝过程，避免拷贝损耗，降低内存使用
+- 改善堆过大时垃圾回收效率，减少STW（stop the world）
+
+既然堆外内存有这么大的优势，为什么还需要分配对象到堆中，不直接分配至堆外就好？
+- 不受JVM管控，即一般的GC，除了Full GC（垃圾分析以及回收时STW对系统影响较大）外，无法回收堆外内存
+- 堆外内存一旦发生泄漏，比较难排查
+- 分配和取消分配的成本通常高于非直接缓冲区
 
 
+
+堆外内存，可通过-XX:MaxDirectMemorySize控制。换句话来说，**堆外内存是有限，即必然会发生内存溢出，以及垃圾回收（依赖于显式调用System.gc()）**。【Java堆外内存分配与回收，可阅读DirectByteBuffer的源码】
+*模拟内存溢出，可以设置JVM参数：-XX:+DisableExplicitGC，禁止代码中显式调用System.gc()*
+
+- 当DirectByteBuffer对象在某次YGC中被回收，只有Cleaner对象知道堆外内存的地址
+- 当下一次Full GC执行时，Cleaner对象会将自身Cleaner链表上删除，并触发clean方法清理堆外内存，此时堆外内存将被回收，Cleaner对象也将在下次Young GC时被回收
 

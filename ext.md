@@ -1,6 +1,6 @@
 ### Ext
 
-1. （类加载阶段）
+1. 
 ```java
 class Singleton{
     private static Singleton singleton = new Singleton();
@@ -46,8 +46,8 @@ public static void main(String[] args) {
     System.out.println("Singleton2 value2:" + singleton2.value2);
 }
 ```
-2. 静态方法中为什么不可用引用this？（虚拟机栈）
-3. （分派）
+2. 静态方法中为什么不可用引用this？
+3. 
 ```java
 public class Demo {
     static abstract class Human {}
@@ -119,7 +119,7 @@ public class Demo {
     }
 }
 ```
-4. try-catch是否会影响性能？（异常表）
+4. try-catch是否会影响性能？
 
 
 
@@ -162,7 +162,7 @@ public class Demo {
 ​    
 
 
-1. 答案：
+1. 答案：（类加载阶段）
 ```java
 Singleton1 value1:1
 Singleton1 value2:0
@@ -173,29 +173,29 @@ Singleton2 value2:1
  分析：
  - Singleton1
  1). 首先执行main中的Singleton singleton = Singleton.getInstance(); 
- 2). 类的加载：加载类Singleton 
- 3). 类的验证 
- 4). 类的准备：为静态变量分配内存，设置默认值。这里为singleton(引用类型)设置为null,value1,value2（基本数据类型）设置默认值0 
- 5). 类的初始化（按照赋值语句进行修改）： 
+     2). 类的加载：加载类Singleton 
+     3). 类的验证 
+     4). 类的准备：为静态变量分配内存，设置默认值。这里为singleton(引用类型)设置为null,value1,value2（基本数据类型）设置默认值0 
+     5). 类的初始化（按照赋值语句进行修改）： 
     - 执行private static Singleton singleton = new Singleton(); 
     - 执行Singleton的构造器：value1++;value2++; 此时value1，value2均等于1 
     - 执行：public static int value1; public static int value2 = 0; 
     - 此时 value1=1，value2=0
 - Singleton2
-1). 首先执行main中的Singleton2 singleton2 = Singleton2.getInstance2(); 
-2). 类的加载：加载类Singleton2 
-3). 类的验证 
-4). 类的准备：为静态变量分配内存，设置默认值。这里为value1,value2（基本数据类型）设置默认值0,singleton2(引用类型)设置为null, 
-5). 类的初始化（按照赋值语句进行修改）： 
+  1). 首先执行main中的Singleton2 singleton2 = Singleton2.getInstance2(); 
+  2). 类的加载：加载类Singleton2 
+  3). 类的验证 
+  4). 类的准备：为静态变量分配内存，设置默认值。这里为value1,value2（基本数据类型）设置默认值0,singleton2(引用类型)设置为null, 
+  5). 类的初始化（按照赋值语句进行修改）： 
     - 执行：public static int value2 = 0; 
     - 此时 value2=0 (value1不变，依然是0); 
     - 执行：private static Singleton singleton = new Singleton(); 
     - 执行Singleton2的构造器：value1++;value2++; 
     - 此时value1，value2均等于1,即为最后结果
 
-2. 答案：this变量不存在与当前方法的局部变量表中
+2. 答案：（虚拟机栈）this变量不存在与当前方法的局部变量表中
 
-3. 答案：多态的表现-静态分派与动态分派
+3. 答案：（分派）多态的表现-静态分派与动态分派
 ```java
 human!
 human!
@@ -210,3 +210,4 @@ woman!
 0
 ```
 
+4. 答案：（异常表）区别于jdk版本，在jdk1.4及之前版本中，异常的处理是通过jsr和set指令来完成，这种方式则是会影响性能的；而jdk1.4之后的版本，异常的处理是采用堆-方法区-异常表的统一处理，这种方式就不会影响性能了
