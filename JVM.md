@@ -465,7 +465,7 @@ JVM必须保存所有方法的**方法名称**、**方法的返回类型**、**�
 
 异常表，每个exception_table都是由start_pc（开始位置）、end_pc（结束位置）、handler_pc（异常开始位置）组成
 
-![](/Users/wuziyi/git/gitbook/res/img/exception-table.png)
+![](res/img/exception-table.png)
 
 - Jdk1.4及之前，并没有异常表的存在，而是通过jsr和set指令来处理异常
 - jdk1.4之后，统一采用方法区-异常表来处理异常
