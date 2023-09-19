@@ -1,10 +1,37 @@
 ### Git
 
-常见命令：
 
-```markdown
-添加： 
-```
+#### config
+
+- 查看系统配置：git config --system --list
+- 查看用户global配置：git config --global --list
+- 查看仓库配置：git config --local --list
+- 配置全局参数：git config --global user.name "xxx" 、 git config --global user.password "xxx"
+- 删除某个全局参数：git config --global --unset [key]
+
+
+
+#### remote
+
+- 查看远程仓库地址：git remote -v
+- 添加远程仓库：git remote add origin [https://xxx.git]
+
+
+
+#### log
+
+- 查看简化版日志：git log --pretty=oneline -n [number]
+- 查看自己的提交日志：git reflog
+
+
+
+#### stash
+
+- 暂存（暂时保存，与暂存区无关）：git stash [save "msg"]
+- 查看暂存列表：git stash list
+- 将暂存区文件恢复到本地：git stash pop stash@{num}
+- 删除一条保存的暂存记录：git stash drop stash@{num}
+- 删除所有保存的暂存记录：git stash clear
 
 
 
@@ -20,6 +47,18 @@ model：
 - --mixed：保留修改文件，只是将 git commit、index 信息回退到了某个版本
 - --soft：保留修改文件，只回退到commit信息到某个版本（不涉及index的回退，如果还需要提交，直接commit即可）
 - --hard：修改文件会清空，完全回退到某个版本
+
+
+
+
+#### merge
+
+- 合并分支：git merge origin/[master|dev|...]
+    - --abort：合并终止退出，并恢复
+    - --continue：合并继续
+- 合并分支（带可视化图像）：git mergetool origin/[master|dev|...]
+- 合并指定提交：git cherry-pick [commit_id]
+
 
 
 
@@ -58,4 +97,18 @@ model：
 ```
 
 - 取消：git rebase --abort
+
+
+
+
+#### commit说明
+
+- feat: 添加新特性
+- fix: 修复bug
+- docs: 仅仅修改了文档
+- style: 仅仅修改了空格、格式缩进、都好等等，不改变代码逻辑
+- refactor: 代码重构，没有加新功能或者修复bug
+- perf: 增加代码进行性能测试
+- test: 增加测试用例
+- chore: 改变构建流程、或者增加依赖库、工具等
 
