@@ -1,6 +1,68 @@
 ### Unix
 
 
+#### awk
+
+> https://en.wikipedia.org/wiki/AWK
+
+注：单引号内为awk脚本语法，双引号为字符串
+
+- -F "n"：按n分割字符串，不加时默认以空格分割
+
+```shell script
+# ripen.txt
+123-abc test1
+456-fgh test2
+
+awk -F "-" '{print $1}' ripen.txt
+# 输出：
+# 123
+# 456
+
+awk -F "-" '{print $1,$2}' ripen.txt
+# 输出：(abc test1是一个完整字符串，并非两个)
+# 123 abc test1
+# 456 ghj test2
+
+awk -F "-" '$1 > 124 {print $1,$2}' ripen.txt
+# 输出
+# 456 ghj test2
+
+# 匹配以123为开头的
+awk -F "-" '/^123/ {print $1,$2}' ripen1.txt
+# 输出：
+# 123 abc test1
+```
+
+```shell script
+awk 'BEGIN {print sqrt(625)}'           # 输出625的平方根：25
+awk 'BEGIN {print atan2(0, -1)*100}'    # 输出：314.159
+```
+
+```shell script
+# ripen.awk文件
+awk -F "-" '{print $1}' $1
+
+# 添加执行权限
+chmod +x ripen.awk
+
+# 执行
+./ripen.awk ripen.txt
+# 输出：
+# 123
+# 456
+```
+
+
+
+拓展：
+
+- nawk：BWK awk
+- gawk：GNU awk
+- ...
+
+
+
 #### tr
 
 > https://www.geeksforgeeks.org/tr-command-in-unix-linux-with-examples/
