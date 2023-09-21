@@ -1,5 +1,10 @@
 ### Git
 
+#### 常见
+
+- 创建空白分支：git checkout --orphan [branch-name] -》 git rm -rf . -》 ...
+
+
 
 #### config
 
