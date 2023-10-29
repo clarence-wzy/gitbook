@@ -41,6 +41,36 @@ Broker为了保证高可用肯定也要采用集群架构，Slave-Broker采用pu
 
 
 
+###### Remoting Module
+
+整个Broker的实体，负责处理来自客户端的请求
+
+
+
+###### Client Manager
+
+负责管理客户端（Producter/Consumer）和维护Consumer的Topic订阅信息
+
+
+
+###### Store Service
+
+提供方便简单的API接口处理消息存储到物理硬盘和查询功能
+
+
+
+###### HA Service
+
+高可用服务，提供Master Broker和Slave Broker之间的数据同步功能
+
+
+
+###### Index Service
+
+根据特定的Message Key，对投递到Broker的消息进行索引服务，以提供消息的快速查询
+
+
+
 ##### Producer / Conumer
 
 生产者和消费者，采用 pull+长轮询 的方式，主动去NameServer上拉取Broker信息
@@ -959,12 +989,56 @@ RocketMQ 领域模型为发布订阅模式，每个主题的队列都可以被�
 
 
 
-##### 消息存储
+##### 消息过期清理机制
+
+由于消息存储在本地磁盘中，即会出现两种情况：
+
+- 本地磁盘空间充足：消息的保存时长 超过 设置的保存时长
+- 本地磁盘空间不足：即使 消息的保存时长 未超过 设置的保存时长，消息仍会被强制清除
+
+建议：在保证存储成本可控下，尽可能延长消息存储时长，可以为紧急故障恢复、应急问题排查和消息回溯提供更多的可操作空间
+
+
+
+
+
+#### 消息存储
 
 原理机制：RocketMQ 使用 存储时长 作为消息存储的依据，即每个节点对外承诺消息的存储时长。在存储时长范围内的消息都会被保留，无论消息是否被消费；超过时长限制的消息，则会被清理掉。
 
 - 消息存储管理粒度：按存储节点管理的存储时长，并不是按主题或队列粒度来管理
 - 消息存储是按照消息的生产时间来计算，和消息是否被消费无关
+- 消息存储主要依赖于三个文件：CommitLog、ComsumeQueue、IndexFile
+
+
+
+##### CommitLog
+
+消息主题以及元数据的存储主体，存储生产者写入的消息主题内容，其内容不是定长的。单个文件大小默认1G, 文件名长度为20位，左边补零，剩余为起始偏移量。
+
+比如00000000000000000000代表了第一个文件，起始偏移量为0，文件大小为1G=1073741824；当第一个文件写满了，第二个文件为00000000001073741824，起始偏移量为1073741824，以此类推。消息主要是顺序写入日志文件，当文件满了，写入下一个文件。
+
+
+
+##### ConsumeQueue
+
+消息消费队列，引入的目的主要是提高消息消费的性能，由于RocketMQ是基于主题topic的订阅模式，消息消费是针对主题进行的，如果要遍历CommitLog文件然后根据topic检索出消息，这种效率就过于低效。**消费者可根据ConsumeQueue来查找待消费的消息。**
+
+ConsumeQueue作为消费消息的索引，保存了指定topic下的队列消息在CommitLog中的起始物理偏移量offset、消息大小size、消息tag的hash值。其具体的存储路径：$HOME/store/consumequeue/{topic}/{queueId}/{fileName}
+
+ConsumeQueue文件采取定长设计，每一个条目共20个字节，分别为8字节的CommitlLog物理偏移量、4字节的消息长度、8字节tag hashcode，单个文件由30W个条目组成，可以像数组一样随机访问每一个条目，每个ConsumeQueue文件大小约5.72M。
+
+
+
+##### IndexFile
+
+IndexFile（索引文件）提供了一种可以通过key或时间区间来查询消息的方法。Index文件的存储位置是：{fileName}，文件名fileName是以创建时的时间戳命名的，固定的单个IndexFile文件大小约为400M，一个IndexFile可以保存 2000W个索引，IndexFile的底层存储设计为在文件系统中实现**HashMap结构**，故**RocketMQ的索引文件其底层实现为hash索引**。
+
+
+
+##### 流程
+
+在RocketMQ的消息存储整体架构图中可以看出，RocketMQ采用的是混合型的存储结构，即为Broker单个实例下所有的队列共用一个日志数据文件（即为CommitLog）来存储。RocketMQ的混合型存储结构(多个Topic的消息实体内容都存储于一个CommitLog中)针对Producer和Consumer分别采用了数据和索引部分相分离的存储结构，**Producer发送消息至Broker端，然后Broker端使用同步或者异步的方式对消息刷盘持久化，保存至CommitLog中。**只要消息被刷盘持久化至磁盘文件CommitLog中，那么Producer发送的消息就不会丢失。正因为如此，Consumer也就肯定有机会去消费这条消息。当无法拉取到消息后，可以等下一次消息拉取，同时服务端也支持长轮询模式，如果一个消息拉取请求未拉取到消息，Broker允许等待30s的时间，只要这段时间内有新消息到达，将直接返回给消费端。这里，RocketMQ的具体做法是，**使用Broker端的后台服务线程—ReputMessageService不停地分发请求并异步构建ConsumeQueue（逻辑消费队列）和IndexFile（索引文件）数据。**
 
 
 
@@ -986,26 +1060,34 @@ RocketMQ 领域模型为发布订阅模式，每个主题的队列都可以被�
 
 
 
-##### 消息过期清理机制
-
-由于消息存储在本地磁盘中，即会出现两种情况：
-
-- 本地磁盘空间充足：消息的保存时长 超过 设置的保存时长
-- 本地磁盘空间不足：即使 消息的保存时长 未超过 设置的保存时长，消息仍会被强制清除
-
-建议：在保证存储成本可控下，尽可能延长消息存储时长，可以为紧急故障恢复、应急问题排查和消息回溯提供更多的可操作空间
-
-
-
 
 
 #### 消费
+
+##### 消息刷盘
+
+消息刷盘，就是将消息持久化到磁盘中
+
+![](res/img/rocket-scrub.jpg)
+
+- 同步刷盘：只有在消息真正被持久化到磁盘后Broker才会真正返回给Producter端一个成功的ACK响应（通常用于金融场景）
+- 异步刷盘：充分利用OS的PageCache优势，只要消息写入PageCache即可将成功的ACK响应给Productor。采用后台异步线程提交进行，降低读写延迟，提高MQ的性能和吞吐量
+
+
 
 ##### 消费模型
 
 ###### 集群消费
 
 同一个Topic下的一条消息只会被同一个消费组中的一个消费者消费，即消息被负载均衡到同一个消费组的多个消息者实例上
+
+- 单Master模式
+- 多Master模式（无Slave全是Master）
+- 多Master多Slave模式-同步：HA Service采用双写方式，即只有主备都写入成功才会返回成功
+- 多Master多Slave模式-异步：HA Service采用异步复制方式，主备有短暂消息延迟
+- Dledger集群模式：至少3个节点，通过Raft自动选举出Leader，其余节点均为Follower，并在Leader和Follower之间复制数据以保证高可用（具备自动**容灾切换**能力）
+
+
 
 ###### 广播消费
 
@@ -1308,3 +1390,32 @@ public class PullConsumer {
 }
 ```
 
+
+
+##### 重复消费
+
+> https://zhuanlan.zhihu.com/p/619116168?utm_id=0
+
+- 消息发送异常时重复发送
+- 消费消息抛出异常
+- 消费者提交offset失败
+- 服务端持久化offset失败
+- 主从同步offset失败
+- 清理长时间消费的消息：消费耗时太长时，服务端会认为消息消费失败
+- 重平衡
+
+![](res/img/rocket-rebalance.webp)
+
+
+
+
+
+#### 总结
+
+##### 工作流程
+
+- 启动NameServer，NameServer起来后监听端口，等待Broker、Producer、Consumer连上来，相当于一个路由控制中心。
+- Broker启动，跟所有的NameServer保持长连接，定时发送心跳包。心跳包中包含当前Broker信息（IP+端口等）以及存储所有Topic信息。注册成功后，NameServer集群中就有Topic跟Broker的映射关系。
+- 收发消息前，先创建Topic，创建Topic时需要指定该Topic要存储在哪些Broker上，也可以在发送消息时自动创建Topic。
+- Producer发送消息，启动时先跟NameServer集群中的其中一台建立长连接，并从NameServer中获取当前发送的Topic存在哪些Broker上，轮询从队列列表中选择一个队列，然后与队列所在的Broker建立长连接从而向Broker发消息。
+- Consumer跟Producer类似，跟其中一台NameServer建立长连接，获取当前订阅Topic存在哪些Broker上，然后直接跟Broker建立连接通道，开始消费消息。
